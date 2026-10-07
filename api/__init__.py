@@ -1,0 +1,1 @@
+"""TalentPulse Python application."""

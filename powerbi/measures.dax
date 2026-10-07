@@ -1,0 +1,12 @@
+// Import talentpulse.bi_daily_kpis and name the model table DailyKpis.
+// Column names follow the aggregate view; verify against its SQL definition.
+Searches = SUM(DailyKpis[searches])
+Application Starts = SUM(DailyKpis[application_starts])
+Completed Applications = SUM(DailyKpis[completed_applications])
+Application Conversion = DIVIDE([Completed Applications], [Searches])
+Application Completion = DIVIDE([Completed Applications], [Application Starts])
+
+// Create a continuous calendar; relate Calendar[Date] to DailyKpis[date].
+Calendar = CALENDAR(MIN(DailyKpis[date]), MAX(DailyKpis[date]))
+Previous Week Conversion = CALCULATE([Application Conversion], DATEADD(Calendar[Date], -7, DAY))
+Conversion Change pp = 100 * ([Application Conversion] - [Previous Week Conversion])
