@@ -175,6 +175,8 @@ CREATE TABLE IF NOT EXISTS fact_search_runs (
   status text NOT NULL,
   -- Not-configured, no-candidate and rate-limited runs have no measured latency.
   latency_ms integer,
+  retrieval_latency_ms integer,
+  inference_latency_ms integer,
   -- Provider responses may omit billing; unknown live cost must remain NULL.
   cost_usd numeric(12,6),
   error_message text,
@@ -202,8 +204,8 @@ CREATE TABLE IF NOT EXISTS live_search_calls (
   provider text NOT NULL,
   model text,
   status text NOT NULL,
-  latency_ms integer NOT NULL,
-  cost_usd numeric(12,6) NOT NULL DEFAULT 0,
+  latency_ms integer,
+  cost_usd numeric(12,6),
   job_ids jsonb NOT NULL DEFAULT '[]'::jsonb,
   error_code text
 );

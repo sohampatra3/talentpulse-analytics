@@ -140,10 +140,10 @@ def extract_ranking(content: str, candidates: list[dict], limit: int) -> tuple[l
 def log_search(query: str, arm: dict, market: str | None = None):
     with connection(readonly=False) as conn:
         run_id = str(uuid.uuid4())
-        conn.execute("INSERT INTO talentpulse.fact_search_runs(run_id,query,market,variant,provider,model,status,latency_ms,cost_usd,error_message,synthetic) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,false)", (run_id, query, market or "All", arm["id"], arm["provider"], arm.get("model"), arm["status"], arm["latency_ms"], arm.get("cost_usd"), arm.get("error")))
+        conn.execute("INSERT INTO talentpulse.fact_search_runs(run_id,query,market,variant,provider,model,status,latency_ms,retrieval_latency_ms,inference_latency_ms,cost_usd,error_message,synthetic) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,false)", (run_id, query, market or "All", arm["id"], arm["provider"], arm.get("model"), arm["status"], arm.get("latency_ms"), arm.get("retrieval_latency_ms"), arm.get("inference_latency_ms"), arm.get("cost_usd"), arm.get("error")))
         for index, job in enumerate(arm["jobs"], start=1):
             conn.execute("INSERT INTO talentpulse.fact_search_results(run_id,job_id,rank,score,explanation) VALUES (%s,%s,%s,%s,%s)", (run_id, job["job_id"], index, job.get("lexical_score") if arm["id"] == "control" else None, arm.get("explanation")))
-        conn.execute("INSERT INTO talentpulse.live_search_calls(query,provider,model,status,latency_ms,cost_usd,job_ids,error_code) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)", (query, arm["provider"], arm.get("model"), arm["status"], arm["latency_ms"] or 0, arm.get("cost_usd") or 0, Jsonb([job["job_id"] for job in arm["jobs"]]), "provider_failure" if arm["status"] == "error" else None))
+        conn.execute("INSERT INTO talentpulse.live_search_calls(query,provider,model,status,latency_ms,cost_usd,job_ids,error_code) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)", (query, arm["provider"], arm.get("model"), arm["status"], arm.get("latency_ms"), arm.get("cost_usd"), Jsonb([job["job_id"] for job in arm["jobs"]]), "provider_failure" if arm["status"] == "error" else None))
 
 
 async def rank(provider: str, query: str, candidates: list[dict], limit: int) -> dict:

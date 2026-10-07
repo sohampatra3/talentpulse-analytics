@@ -1,5 +1,6 @@
 """Protect analytics semantics, read-only boundaries and honest model output."""
 import asyncio
+from contextlib import contextmanager
 from datetime import date
 
 import pytest
@@ -13,6 +14,30 @@ from api.analytics.exports import csv_text
 from api.analytics.filters import Filters
 from api.analytics.integrations import integrations
 from api.analytics.providers import ProviderFailure, extract_ranking, models
+
+
+def test_live_logs_preserve_unknown_values_and_latency_components(monkeypatch):
+    from api.analytics import providers
+    calls = []
+    class FakeConnection:
+        def execute(self, sql, params):
+            calls.append((sql, params))
+    @contextmanager
+    def fake_connection(readonly=True):
+        yield FakeConnection()
+    monkeypatch.setattr(providers, "connection", fake_connection)
+    arm = {"id":"ollama","provider":"ollama","model":"gpt-oss:120b","status":"not_configured","latency_ms":None,"retrieval_latency_ms":1500,"inference_latency_ms":None,"cost_usd":None,"jobs":[]}
+    providers.log_search("Product analyst", arm, "Germany")
+    canonical = calls[0]
+    compatibility = calls[1]
+    assert "retrieval_latency_ms,inference_latency_ms" in canonical[0]
+    assert canonical[1][7:11] == (None, 1500, None, None)
+    assert compatibility[1][4:6] == (None, None)
+    calls.clear()
+    success = {**arm,"status":"success","latency_ms":4500,"inference_latency_ms":3000,"cost_usd":0.0033275}
+    providers.log_search("Product analyst", success, "Germany")
+    assert calls[0][1][7:11] == (4500,1500,3000,0.0033275)
+    assert calls[1][1][4:6] == (4500,0.0033275)
 
 
 def test_filters_are_parameterized_and_all_is_normalized():
