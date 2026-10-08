@@ -2,7 +2,9 @@
 
 An independent portfolio project for product analysts in a European job marketplace. Observe a KPI, investigate the funnel, locate a segment, assess a release, evaluate an experiment, and turn evidence into a product recommendation.
 
-[Open the live workspace](https://talentpulse-analytics.vercel.app) · [Source on GitHub](https://github.com/sohampatra3/talentpulse-analytics) · [Five-minute demo](docs/demo-walkthrough.md)
+[Open the live workspace](https://talentpulse-analytics.vercel.app) · [Source on GitHub](https://github.com/sohampatra3/talentpulse-analytics) · [Five-minute demo](docs/demo-walkthrough.md) · [Referral and portfolio strategy](public/portfolio-strategy.md)
+
+Created by **Soham Patra**.
 
 All historical marketplace behavior is **reproducible synthetic data**, not StepStone data. The simulated model arms illustrate an analytical method; their lift is not evidence that a real model improves a real marketplace. The live search comparison records actual provider calls separately.
 
@@ -28,9 +30,12 @@ flowchart LR
 - **Funnel & segments:** ordered session funnel, transition drop-off, segmentation and consistent filters.
 - **Release impact:** matched before/after windows and affected segments. Observational differences are hypotheses, not causal estimates.
 - **AI analyst:** evidence-backed interpretation, a chart draft using queried numbers, and an exportable recommendation.
+- **Power BI:** dedicated secure report setup, authorized REST discovery, report links, opt-in embedding and permission/refresh guidance.
+- **Adobe Analytics:** dedicated REST/MCP authentication setup, actual report queries, selectable-metric charts and response provenance.
+- **Feedback & decisions:** private Neon-backed observations, test briefs, decision stages and CSV export with saved dataset context.
 - **Data & connections:** quality checks, tracking dictionary, Neon, OpenRouter, Ollama, Adobe and Power BI setup.
 
-Light, dark and warm amber themes are available, with larger typography and translucent glass panels. Requests have bounded timeouts, retry controls and cached results so navigation remains available during refreshes.
+Light, dark, warm amber and Frosted themes are available, with a 17px default font and translucent glass panels. Interactive charts switch area/line views, compare distinctly colored experiment arms and animate AI visualization drafts. Motion respects reduced-motion preferences. Requests have bounded timeouts, retry controls and cached results so navigation remains available during refreshes.
 
 Every page includes a private CSV/XLSX dataset library. Google Gemma 4 31B can propose semantic descriptions and column mappings; validated fields determine which analyses are available. A job catalog supports discovery, while conversion comparisons require behavioral outcomes and denominators. Uploaded results retain their own source labels and never mix silently with the synthetic demonstration.
 
@@ -59,7 +64,7 @@ Open http://localhost:3000. FastAPI OpenAPI documentation is available at the co
 
 The seed skips an already completed dataset. It commits bounded batches to support small Neon compute instances and writes its completion manifest after reconciliation. An interrupted initial load must be explicitly rebuilt with `--reset`. That reset affects only this application's schema; never point a reset at an unrelated production database. Use a direct Neon connection for migrations and seeding and a pooled connection for serverless requests.
 
-Read [analytical methodology](docs/methodology.md), [demonstration walkthrough](docs/demo-walkthrough.md), [Power BI setup](powerbi/README.md), and the backend API contract for metric definitions and practical limitations.
+Read [analytical methodology](docs/methodology.md), [demonstration walkthrough](docs/demo-walkthrough.md), [Power BI setup](powerbi/README.md), [full Adobe/Power BI connection guide](docs/integration-guide.md), and the backend API contract for metric definitions and practical limitations.
 
 ## Providers and credentials
 
@@ -92,6 +97,6 @@ Run `.venv/bin/python scripts/verify_dataset.py` to reconcile counts, funnel ord
 
 The repository includes Vercel configuration for Next.js and a Python FastAPI function. Configure encrypted environment variables before production deployment. The database is independently managed by Neon in Frankfurt. GitHub contains source and reproducibility instructions, not database passwords or provider credentials.
 
-For an existing database, test the additive SQL files in `database/migrations` on an isolated Neon branch, then run `scripts/migrate.py` against the main direct connection. The extension preserves the seeded marketplace tables. Read the [upload contract](docs/uploads-api-contract.md), [workspace connector contract](docs/connectors-api-contract.md) and [public StepStone research](docs/stepstone-research.md) for integration details and the evidence behind the investigation ideas.
+For an existing database, test the additive SQL files in `database/migrations` on an isolated Neon branch, then run `scripts/migrate.py` against the main direct connection. The extension preserves the seeded marketplace tables. Read the [upload contract](docs/uploads-api-contract.md), [workspace connector contract](docs/connectors-api-contract.md), [private feedback contract](docs/feedback-api-contract.md) and [public StepStone research](docs/stepstone-research.md) for integration details and the evidence behind the investigation ideas.
 
 This lab is independent of and not endorsed by StepStone. It demonstrates SQL, Python, tracking design, product KPIs, funnel analysis, segmentation, release assessment, experiment statistics and grounded AI communication. It does not claim to describe internal StepStone systems or known company problems.

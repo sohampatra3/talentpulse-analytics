@@ -89,6 +89,9 @@ export type ViewName =
   | "funnel"
   | "releases"
   | "analyst"
+  | "powerbi"
+  | "adobe"
+  | "feedback"
   | "connections";
 type ViewProps = { filters: Filters; navigate: (view: ViewName) => void };
 

@@ -15,7 +15,7 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{const t=localStorage.getItem('talentpulse.theme.v1');document.documentElement.dataset.theme=['light','dark','amber'].includes(t)?t:'light'}catch(e){document.documentElement.dataset.theme='light'}`,
+            __html: `try{const t=localStorage.getItem('talentpulse.theme.v1');document.documentElement.dataset.theme=['light','dark','amber','frosted'].includes(t)?t:'light'}catch(e){document.documentElement.dataset.theme='light'}`,
           }}
         />
       </head>

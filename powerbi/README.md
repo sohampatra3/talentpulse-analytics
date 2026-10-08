@@ -18,4 +18,6 @@ Recommended pages:
 | Search experiment | Treatment rates, uncertainty, guardrails | Does the evidence support rollout? |
 | Releases | Matched-period trends, error rates | What should we investigate? |
 
-Experiment significance is computed by the Python statistical service. Import or export that result alongside the counts. A report URL is labelled configured when supplied; Microsoft authentication and report permissions determine whether it can actually be opened. The app does not claim to validate a Power BI account connection.
+Experiment significance is computed by the Python statistical service. Import or export that result alongside the counts. A report URL is labelled configured when supplied. An authorized REST token can verify report discovery; opening a report still depends on Microsoft sign-in, viewer permissions and licensing. The dedicated Power BI tab keeps these checks separate and can open your connected report.
+
+See [the full integration guide](../docs/integration-guide.md) for Microsoft Entra app registration, REST scopes, refresh, row-level security, secure embedding and troubleshooting.

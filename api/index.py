@@ -34,10 +34,12 @@ from api.analytics.connectors import router as connectors_router
 from api.analytics.workspaces import workspace_identity, connector_config
 from api.analytics.upload_router import router as uploads_router
 from api.analytics.uploads import UploadError
+from api.analytics.feedback import router as feedback_router
 
 app = FastAPI(title="TalentPulse Analytics Lab", version="1.1.0", description="An independent job-search product analytics portfolio lab with explicitly synthetic history and private uploaded evidence. Analytics, inference and model adapters are implemented in Python.", docs_url="/api/docs", openapi_url="/api/openapi.json", redoc_url=None)
 app.include_router(connectors_router)
 app.include_router(uploads_router)
+app.include_router(feedback_router)
 
 _cache: dict[str, tuple[float, dict]] = {}
 _cache_lock = threading.Lock()

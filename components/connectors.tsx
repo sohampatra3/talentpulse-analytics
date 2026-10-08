@@ -104,7 +104,7 @@ function Field({
   );
 }
 
-export function ConnectorStudio() {
+export function ConnectorStudio({ only }: { only?: string[] } = {}) {
   const workspace = useWorkspace();
   const [selected, setSelected] = useState<string | null>(null);
   const [settings, setSettings] = useState<Record<string, string>>({});
@@ -317,7 +317,7 @@ export function ConnectorStudio() {
         </div>
       ) : null}
       <div className="private-connectors-grid">
-        {SPECS.map((spec) => {
+        {SPECS.filter((spec) => !only || only.includes(spec.id)).map((spec) => {
           const stored = workspace.connectors.find(
             (item) => item.id === spec.id,
           );

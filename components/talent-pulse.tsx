@@ -22,6 +22,7 @@ import {
   Sun,
   Users,
   UploadCloud,
+  MessageSquareText,
 } from "lucide-react";
 import {
   apiFilters,
@@ -45,6 +46,8 @@ import {
 import { Pill } from "./ui";
 import { WorkspaceProvider, useWorkspace } from "./workspace";
 import { DatasetReadiness, UploadsDialog } from "./uploads";
+import { PowerBIHub, AdobeAnalyticsHub } from "./integration-hubs";
+import { FeedbackView } from "./feedback";
 
 const NAVIGATION = [
   {
@@ -83,6 +86,30 @@ const NAVIGATION = [
     icon: Sparkles,
     title: "Your AI analyst",
     description: "From a good question to a clear, visual explanation.",
+  },
+  {
+    id: "powerbi" as const,
+    label: "Power BI",
+    icon: BarChart3,
+    title: "Power BI workspace",
+    description:
+      "Connect your report, explore the semantic model, and share a clear decision.",
+  },
+  {
+    id: "adobe" as const,
+    label: "Adobe Analytics",
+    icon: Globe2,
+    title: "Adobe Analytics workspace",
+    description:
+      "Validate behavioral evidence with your own report suite, REST API or MCP connection.",
+  },
+  {
+    id: "feedback" as const,
+    label: "Feedback & decisions",
+    icon: MessageSquareText,
+    title: "Feedback & decisions",
+    description:
+      "From a candidate signal to a testable hypothesis and a documented next step.",
   },
   {
     id: "connections" as const,
@@ -145,7 +172,12 @@ function TalentPulseWorkspace() {
     setView(next);
     setMobileOpen(false);
     window.location.hash = next;
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({
+      top: 0,
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth",
+    });
   }
   function toggleTheme(next: string) {
     setTheme(next);
@@ -189,7 +221,7 @@ function TalentPulseWorkspace() {
   const unsupported = Boolean(
     workspace.dataset &&
     workspace.dataset.readiness[readinessKey] === false &&
-    view !== "connections" &&
+    !["connections", "powerbi", "adobe", "feedback"].includes(view) &&
     view !== "experiments",
   );
   useEffect(() => {
@@ -260,17 +292,22 @@ function TalentPulseWorkspace() {
       </aside>
       <div className="main-shell">
         <header className="topbar">
-          <div className="breadcrumb">
-            <button
-              className="icon-button mobile-menu"
-              aria-label="Open navigation"
-              onClick={() => setMobileOpen(true)}
-            >
-              <Menu size={17} />
-            </button>
-            <span>Workspace</span>
-            <ChevronRight size={11} />
-            <strong>{current.label}</strong>
+          <div className="topbar-identity">
+            <span className="creator-credit">
+              Created by <strong>Soham Patra</strong>
+            </span>
+            <div className="breadcrumb">
+              <button
+                className="icon-button mobile-menu"
+                aria-label="Open navigation"
+                onClick={() => setMobileOpen(true)}
+              >
+                <Menu size={17} />
+              </button>
+              <span>Workspace</span>
+              <ChevronRight size={11} />
+              <strong>{current.label}</strong>
+            </div>
           </div>
           <div className="topbar-actions">
             <span
@@ -289,6 +326,7 @@ function TalentPulseWorkspace() {
                 className={theme === "light" ? "selected" : ""}
                 onClick={() => toggleTheme("light")}
                 aria-label="Light mode"
+                title="Light"
                 aria-pressed={theme === "light"}
               >
                 <Sun size={13} />
@@ -297,6 +335,7 @@ function TalentPulseWorkspace() {
                 className={theme === "dark" ? "selected" : ""}
                 onClick={() => toggleTheme("dark")}
                 aria-label="Dark mode"
+                title="Dark"
                 aria-pressed={theme === "dark"}
               >
                 <Moon size={12} />
@@ -305,9 +344,20 @@ function TalentPulseWorkspace() {
                 className={theme === "amber" ? "selected" : ""}
                 onClick={() => toggleTheme("amber")}
                 aria-label="Warm amber dark mode"
+                title="Warm amber"
                 aria-pressed={theme === "amber"}
               >
                 <Palette size={13} />
+              </button>
+              <button
+                className={`frosted-theme-option ${theme === "frosted" ? "selected" : ""}`}
+                onClick={() => toggleTheme("frosted")}
+                aria-label="Frosted glass mode"
+                aria-pressed={theme === "frosted"}
+                title="Frosted glass"
+              >
+                <Sparkles size={13} />
+                <span>Frosted</span>
               </button>
             </div>
           </div>
@@ -490,6 +540,12 @@ function TalentPulseWorkspace() {
             <ReleasesView {...props} />
           ) : view === "analyst" ? (
             <AnalystView {...props} />
+          ) : view === "powerbi" ? (
+            <PowerBIHub filters={effectiveFilters} />
+          ) : view === "adobe" ? (
+            <AdobeAnalyticsHub filters={effectiveFilters} />
+          ) : view === "feedback" ? (
+            <FeedbackView {...props} />
           ) : (
             <ConnectionsView {...props} />
           )}

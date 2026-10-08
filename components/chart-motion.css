@@ -1,0 +1,138 @@
+.motion-chart {
+  min-width: 0;
+  padding-top: 13px;
+}
+.chart-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 10px 9px 18px;
+}
+.chart-control-context {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+}
+.chart-segments {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-soft);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+.chart-segments button {
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-secondary);
+  min-height: 32px;
+  padding: 5px 11px;
+  font-size: 13px;
+  font-weight: 550;
+  white-space: nowrap;
+  transition:
+    background 180ms ease,
+    box-shadow 180ms ease,
+    color 180ms ease;
+}
+.chart-segments button[aria-pressed="true"] {
+  background: var(--surface-solid);
+  color: var(--text);
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.08);
+}
+.chart-segments button:focus-visible {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 3px;
+}
+.chart-animated-plot {
+  min-width: 0;
+}
+.chart-animated-plot[data-motion="animated"] {
+  animation: chart-arrive 500ms ease-out both;
+}
+.motion-chart-tooltip {
+  max-width: min(290px, 80vw);
+  font-size: 13px;
+  border-radius: 14px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
+}
+.motion-chart-tooltip strong {
+  font-size: 13px;
+  line-height: 1.45;
+}
+.motion-chart-tooltip p {
+  gap: 14px;
+}
+.motion-chart-tooltip p span:last-child {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.chart-arm-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  padding: 8px 12px 0 18px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.chart-arm-key > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.chart-arm-key i {
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.chart-arm-key strong {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.chart-display-note {
+  padding: 8px 16px 0 18px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+@keyframes chart-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 520px) {
+  .chart-controls {
+    margin-left: 12px;
+  }
+  .chart-arm-key {
+    padding-left: 12px;
+    gap: 6px 12px;
+  }
+  .chart-control-context {
+    font-size: 12.5px;
+  }
+  .chart-segments button {
+    min-height: 34px;
+    padding-inline: 9px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chart-animated-plot[data-motion="animated"] {
+    animation: none;
+  }
+  .chart-segments button {
+    transition: none;
+  }
+}
