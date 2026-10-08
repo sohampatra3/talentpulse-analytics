@@ -166,7 +166,7 @@ def test_missing_database_returns_503_without_fake_data(monkeypatch):
     def unavailable(*args, **kwargs):
         raise DatabaseUnavailable("Database unavailable")
     monkeypatch.setattr(endpoint, "row", unavailable)
-    response = TestClient(app).get("/api/health")
+    response = TestClient(app).get("/api/health/database")
     assert response.status_code == 503
     assert response.json()["code"] == "database_unavailable"
     assert "kpis" not in response.json()

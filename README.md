@@ -30,7 +30,9 @@ flowchart LR
 - **AI analyst:** evidence-backed interpretation, a chart draft using queried numbers, and an exportable recommendation.
 - **Data & connections:** quality checks, tracking dictionary, Neon, OpenRouter, Ollama, Adobe and Power BI setup.
 
-Light and dark themes are available. The application clearly distinguishes connected, unconfigured, failed and simulated states.
+Light, dark and warm amber themes are available, with larger typography and translucent glass panels. Requests have bounded timeouts, retry controls and cached results so navigation remains available during refreshes.
+
+Every page includes a private CSV/XLSX dataset library. Google Gemma 4 31B can propose semantic descriptions and column mappings; validated fields determine which analyses are available. A job catalog supports discovery, while conversion comparisons require behavioral outcomes and denominators. Uploaded results retain their own source labels and never mix silently with the synthetic demonstration.
 
 ## Run locally
 
@@ -43,6 +45,7 @@ python3 -m venv .venv
 cp .env.example .env
 # Set the database and provider credentials in .env.
 .venv/bin/python scripts/seed.py
+.venv/bin/python scripts/migrate.py
 .venv/bin/uvicorn api.index:app --host 127.0.0.1 --port 8000
 # In a second terminal:
 npm run dev
@@ -62,10 +65,16 @@ Read [analytical methodology](docs/methodology.md), [demonstration walkthrough](
 
 - OpenRouter: `OPENROUTER_API_KEY`, default `OPENROUTER_MODEL=openai/gpt-4o`.
 - Ollama Cloud: `OLLAMA_API_KEY`, default `OLLAMA_MODEL=gpt-oss:120b`. No local model download is required.
+- Upload interpretation: `OLLAMA_INGEST_MODEL=gemma4:31b`. The UI can select supported cloud models returned by the provider catalog.
+- Workspace credential encryption: generate a Fernet key for `APP_ENCRYPTION_KEY`; keep the same encrypted setting across deployments so saved connections remain readable.
 - Power BI: native PostgreSQL connection plus your Microsoft account and workspace. Optional `POWERBI_EMBED_URL` enables an existing report.
 - Adobe Analytics: your organization's OAuth credentials and report suite, when available. Synthetic Neon data works independently.
 
-Keys are server-only. Never commit `.env`, put keys in `NEXT_PUBLIC_*`, paste keys into the browser, or include credentials in exported reports. Missing provider credentials leave the evidence mode and SQL analytics available. Public demo AI usage is bounded; it is not an unrestricted provider proxy.
+Shared provider keys are server-only. Personal connector credentials submitted through the workspace form are encrypted on the server and returned only as presence indicators. The browser stores a random private workspace token; the database stores only its hash. Preserve that token to retain access to your uploads and settings. Never commit `.env`, put keys in `NEXT_PUBLIC_*`, or include credentials in exported reports. Missing provider credentials leave the evidence mode and SQL analytics available. Public demo AI usage is bounded.
+
+Adobe supports authorized REST reports and its official MCP endpoint, with bearer or server-to-server OAuth configuration. A connection is marked verified only after a real request succeeds. Power BI supports an authorized embed URL and optional REST report discovery. External MCP enrichment accepts public HTTPS endpoints and read-only tools. These connections need credentials from your own organization.
+
+Uploads are limited to 3 MB, 10,000 rows and 20 columns per file. XLSX files must contain one values-only worksheet. Private uploaded data is searchable in Neon, and mapping/readiness checks explain missing fields before a funnel or experiment is calculated. Role-level comparisons are exploratory and adjusted across the displayed family; observational outcomes do not establish a causal model effect.
 
 ## Verify
 
@@ -82,5 +91,7 @@ Run `.venv/bin/python scripts/verify_dataset.py` to reconcile counts, funnel ord
 ## Deploy
 
 The repository includes Vercel configuration for Next.js and a Python FastAPI function. Configure encrypted environment variables before production deployment. The database is independently managed by Neon in Frankfurt. GitHub contains source and reproducibility instructions, not database passwords or provider credentials.
+
+For an existing database, test the additive SQL files in `database/migrations` on an isolated Neon branch, then run `scripts/migrate.py` against the main direct connection. The extension preserves the seeded marketplace tables. Read the [upload contract](docs/uploads-api-contract.md), [workspace connector contract](docs/connectors-api-contract.md) and [public StepStone research](docs/stepstone-research.md) for integration details and the evidence behind the investigation ideas.
 
 This lab is independent of and not endorsed by StepStone. It demonstrates SQL, Python, tracking design, product KPIs, funnel analysis, segmentation, release assessment, experiment statistics and grounded AI communication. It does not claim to describe internal StepStone systems or known company problems.

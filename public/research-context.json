@@ -1,0 +1,58 @@
+{
+  "reviewed_at": "2026-10-08",
+  "title": "Public signals → testable product questions",
+  "scope": "Independent portfolio research. Public priorities and individual feedback inspire hypotheses; they do not establish internal StepStone incidents or prove a model improves conversion.",
+  "opportunities": [
+    {
+      "id": "accountable-analysis",
+      "title": "Make every result reviewable",
+      "signal": "The current Product Analyst role combines tracking validation, experiments, opportunity sizing and AI-assisted analysis with responsibility for correctness.",
+      "hypothesis": "A visible denominator, source and readiness check can help analysts catch unsupported conclusions before a leadership review.",
+      "measure": "Mapped rows, available exposure counts, experiment provenance and numeric evidence lineage.",
+      "source": "StepStone · Product Analyst role",
+      "url": "https://www.stepstone.de/stellenangebote--Product-Analyst-Duesseldorf-The-Stepstone-Group-GmbH--14495892-inline.html",
+      "evidence_type": "Official hiring priorities"
+    },
+    {
+      "id": "role-relevance",
+      "title": "Investigate role relevance before rollout",
+      "signal": "StepStone's 2025 candidate-journey research describes hybrid AI and traditional search behavior, alongside concerns about answer quality and trust.",
+      "hypothesis": "AI ranking may help some job roles more than others. Compare valid role-level outcomes and inspect device, market and acquisition mix.",
+      "measure": "Exposure → application conversion, completion, latency and cost; role slices remain exploratory.",
+      "source": "StepStone · Candidate Journey study, 26 November 2025",
+      "url": "https://www.stepstone.de/e-recruiting/hr-wissen/recruiting/stepstone-studie-2025-ki-und-jobsuche/",
+      "evidence_type": "Official research"
+    },
+    {
+      "id": "model-evaluation",
+      "title": "Evaluate the analyst's AI, too",
+      "signal": "An indexed public LinkedIn recommendation by a former manager describes a StepStone analyst's work on LLM evaluation and an analytics agent architecture.",
+      "hypothesis": "Compare model outputs on valid catalog IDs, schema mapping and evidence coverage rather than treating fluent explanations as accuracy.",
+      "measure": "Validated result IDs, parsing coverage, actual provider latency, missing billing data and evidence-only fallback.",
+      "source": "LinkedIn · Callum Thickett public recommendation",
+      "url": "https://uk.linkedin.com/in/callum-thickett",
+      "evidence_type": "Indexed professional endorsement; historical work"
+    },
+    {
+      "id": "candidate-friction",
+      "title": "Separate discovery from application friction",
+      "signal": "German Reddit discussions contain mixed experiences: successful job searches alongside concerns about irrelevant suggestions and missing employer feedback.",
+      "hypothesis": "A ranking improvement may fail to improve completed applications if upload friction, job relevance or external handoffs dominate.",
+      "measure": "Role and device funnels, application errors, listing freshness and feedback events when those columns are supplied.",
+      "source": "Reddit · German candidate discussions",
+      "url": "https://www.reddit.com/r/Studium/comments/1tlesp6/funktioniert_stepstone_%C3%BCberhaupt/",
+      "additional_url": "https://www.reddit.com/r/Germany_Jobs/comments/1sqqwxx/indeed_und_stepstone_bekommt_wirklich_jemand/",
+      "evidence_type": "Individual anecdotes; unrepresentative sample"
+    },
+    {
+      "id": "explainable-recommendations",
+      "title": "Keep model recommendations explainable",
+      "signal": "StepStone publicly identifies explainability, autonomy and responsible handling of user data as technology principles.",
+      "hypothesis": "Source-linked explanations and private workspace uploads make model-assisted investigation easier to inspect and control.",
+      "measure": "Source attribution, workspace isolation and model output validation; behavioral slices do not establish demographic fairness.",
+      "source": "The Stepstone Group · Responsible product and technology",
+      "url": "https://www.thestepstonegroup.com/english/sustainability/responsible-product-and-technology/",
+      "evidence_type": "Official technology principles"
+    }
+  ]
+}

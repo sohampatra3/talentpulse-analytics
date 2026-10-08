@@ -5,14 +5,14 @@ from urllib.parse import urlparse
 
 import httpx
 
-from .providers import models
+from .providers import PROVIDERS, configured, model_id
 
 
 def integrations() -> dict:
     adobe = all(os.getenv(key) for key in ("ADOBE_CLIENT_ID", "ADOBE_ACCESS_TOKEN"))
     powerbi_embed = os.getenv("POWERBI_EMBED_URL", "")
     powerbi = bool(powerbi_embed and urlparse(powerbi_embed).hostname in ("app.powerbi.com", "app.powerbigov.us"))
-    providers = models()["providers"]
+    providers = [{"id": name, "label": spec["label"], "model": model_id(name), "configured": configured(name), "status": "configured" if configured(name) else "not_configured", "description": "Server credentials are configured; live connection is verified on an actual successful inference." if configured(name) else "No deployment API key is configured."} for name, spec in PROVIDERS.items()]
     items = [
         {"id": "neon", "name": "Neon PostgreSQL", "type": "database", "configured": bool(os.getenv("DATABASE_URL")), "status": "configured" if os.getenv("DATABASE_URL") else "not_configured", "description": "The dashboard queries real PostgreSQL tables containing labelled synthetic telemetry. Health checks verify a live database read.", "required_env": ["DATABASE_URL"], "capabilities": ["Parameterized SQL", "Synthetic events", "Read-only BI views", "CSV export"], "setup_url": "https://neon.com/docs/connect/connect-from-any-app"},
         {"id": "adobe", "name": "Adobe Analytics", "type": "analytics", "configured": adobe, "status": "configured" if adobe else "not_configured", "description": "Optional Adobe Analytics 2.0 REST adapter. Supply your own authorized OAuth token and client ID, then verify the connection with a read-only discovery request.", "required_env": ["ADOBE_CLIENT_ID", "ADOBE_ACCESS_TOKEN", "ADOBE_COMPANY_ID", "ADOBE_REPORT_SUITE_ID"], "capabilities": ["Company discovery", "Report-suite configuration", "OAuth bearer authentication"], "setup_url": "https://developer.adobe.com/analytics-apis/docs/2.0/", "details": {"company_id": os.getenv("ADOBE_COMPANY_ID") or None, "report_suite_id": os.getenv("ADOBE_REPORT_SUITE_ID") or None, "check_endpoint": "/api/integrations/adobe/check"}},

@@ -49,7 +49,7 @@ function ChartTooltip({
   );
 }
 
-const axisStyle = { fontSize: 9, fill: "var(--muted)" };
+const axisStyle = { fontSize: 11, fill: "var(--muted)" };
 
 export function ProductTrend({
   data,
@@ -162,14 +162,8 @@ export function ExperimentBars({
             dataKey="label"
             axisLine={false}
             tickLine={false}
-            tick={{ ...axisStyle, fontSize: 8 }}
-            tickFormatter={(label) =>
-              String(label).includes("Manual")
-                ? "Manual search"
-                : String(label).includes("GPT-4o")
-                  ? "GPT-4o"
-                  : "GPT-OSS 120B"
-            }
+            tick={{ ...axisStyle, fontSize: 10 }}
+            tickFormatter={(label) => String(label)}
             dy={7}
           />
           <YAxis

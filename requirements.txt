@@ -8,3 +8,7 @@ scipy>=1.14,<2
 numpy>=2,<3
 pandas>=2.2,<3
 statsmodels>=0.14,<1
+cryptography>=45,<47
+openpyxl>=3.1,<4
+python-multipart>=0.0.20,<1
+defusedxml>=0.7.1,<1

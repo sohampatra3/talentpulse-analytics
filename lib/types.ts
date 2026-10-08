@@ -1,5 +1,5 @@
 export type Meta = {
-  synthetic: boolean;
+  synthetic: boolean | null;
   start_date: string;
   end_date: string;
   source?: string;
@@ -80,6 +80,9 @@ export type ExperimentsData = {
   experiment_id?: string;
   name?: string;
   primary_metric?: string;
+  analysis_unit?: string;
+  available?: boolean;
+  reason?: string;
   status?: string;
   arms: ExperimentArm[];
   srm: { p_value: number | null; mismatch: boolean; status: string };
@@ -214,13 +217,62 @@ export type ModelsData = {
     max_query_length: number;
   };
   synthetic_catalog: boolean;
+  catalog?: {
+    provider: string;
+    id: string;
+    label: string;
+    source: string;
+    available: boolean;
+    capabilities: string[];
+  }[];
+  catalog_status?: string | Record<string, unknown>;
+  defaults?: {
+    search: { openrouter: string; ollama: string };
+    analyst: { provider: string; model: string };
+    ingestion: { provider: string; model: string };
+  };
+};
+
+export type WorkspaceConnector = {
+  id: string;
+  name: string;
+  configured: boolean;
+  status: string;
+  settings: Record<string, unknown>;
+  secrets_present: string[];
+  last_tested_at?: string | null;
+  last_result?: {
+    verified?: boolean;
+    status?: string;
+    detail?: string;
+    capabilities?: string[];
+  } | null;
+};
+export type UploadDataset = {
+  dataset_id: string;
+  id?: string;
+  name: string;
+  kind: string;
+  row_count: number;
+  column_count: number;
+  columns: string[];
+  mapping: Record<string, string>;
+  created_at: string;
+  readiness: Record<string, boolean>;
+  reasons?: Record<string, string>;
+  date_range?: { start_date: string; end_date: string } | null;
+  preview?: Record<string, unknown>[];
+  profile?: Record<string, unknown>;
+  semantic_metadata?: Record<string, unknown>;
+  warnings?: string[];
+  filter_options?: FilterOptions;
 };
 export type AnalystAnswer = {
   answer: string;
   mode: "provider" | "evidence";
   provider: string;
   model: string | null;
-  synthetic: boolean;
+  synthetic: boolean | null;
   evidence: { label: string; value: number; unit: string }[];
   chart: {
     type: "line" | "bar";
@@ -248,7 +300,7 @@ export type IntegrationData = {
   integrations: Integration[];
   exports: { id: string; label: string; url: string }[];
   mcp: { endpoint: string; transport: string; tools: string[] };
-  synthetic: boolean;
+  synthetic: boolean | null;
 };
 export type QualityData = {
   meta: Meta;
@@ -283,7 +335,7 @@ export type TrackingData = {
     volume: number;
   }[];
   common_properties: string[];
-  synthetic: boolean;
+  synthetic: boolean | null;
 };
 export type FilterOptions = {
   markets: string[];
@@ -291,5 +343,5 @@ export type FilterOptions = {
   user_types: string[];
   job_categories: string[];
   date_range: { start_date: string; end_date: string };
-  synthetic: boolean;
+  synthetic: boolean | null;
 };

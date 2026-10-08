@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import logging
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import date, datetime
@@ -45,7 +46,7 @@ def connection(readonly: bool = True):
     if not url:
         raise DatabaseUnavailable("Neon database is not configured. Set DATABASE_URL on the server.")
     try:
-        with psycopg.connect(url, row_factory=dict_row, connect_timeout=10) as conn:
+        with psycopg.connect(url, row_factory=dict_row, connect_timeout=6) as conn:
             if readonly:
                 conn.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
             conn.execute("SET LOCAL statement_timeout = '25000ms'")
@@ -56,6 +57,7 @@ def connection(readonly: bool = True):
                 _active_transaction.reset(token)
     except psycopg.Error as exc:
         # Connection strings and provider response bodies must never reach the public API.
+        logging.getLogger(__name__).warning("Neon request failed: exception_class=%s sqlstate=%s", type(exc).__name__, getattr(exc, "sqlstate", None) or "unavailable")
         raise DatabaseUnavailable("The Neon analytics database could not complete this request. Please retry shortly.") from exc
 
 

@@ -11,8 +11,8 @@ import {
   RefreshCw,
   Sparkles,
 } from "lucide-react";
-import type { CSSProperties, ReactNode } from "react";
-import { formatNumber } from "@/lib/api";
+import { useState, type CSSProperties, type ReactNode } from "react";
+import { downloadApi, formatNumber } from "@/lib/api";
 
 export function Pill({
   children,
@@ -192,10 +192,43 @@ export function EmptyState({
 export function ExportButton({
   url,
   label = "Export data",
+  authenticated = false,
 }: {
   url: string;
   label?: string;
+  authenticated?: boolean;
 }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function download() {
+    setBusy(true);
+    setError(null);
+    try {
+      await downloadApi(url, "talentpulse-upload.csv");
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Export failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (authenticated)
+    return (
+      <span className="export-button-wrap">
+        <button className="button subtle" onClick={download} disabled={busy}>
+          {busy ? (
+            <LoaderCircle size={15} className="spin" />
+          ) : (
+            <Download size={15} />
+          )}
+          <span>{label}</span>
+        </button>
+        {error ? (
+          <span className="small muted" role="alert">
+            {error}
+          </span>
+        ) : null}
+      </span>
+    );
   return (
     <a href={url} className="button subtle" download>
       <Download size={15} />
@@ -218,6 +251,43 @@ export function Note({ children }: { children: ReactNode }) {
     <div className="data-note">
       <span className="note-dot" />
       {children}
+    </div>
+  );
+}
+
+export function RequestStatus({
+  refreshing,
+  error,
+  retry,
+  lastUpdated,
+}: {
+  refreshing: boolean;
+  error: string | null;
+  retry: () => void;
+  lastUpdated?: number | null;
+}) {
+  if (!refreshing && !error) return null;
+  return (
+    <div
+      className={`request-status ${error ? "request-stale" : ""}`}
+      role="status"
+    >
+      {refreshing ? (
+        <LoaderCircle size={14} className="spin" />
+      ) : (
+        <AlertCircle size={14} />
+      )}
+      <span>
+        {error
+          ? `Showing the last available evidence${lastUpdated ? ` from ${new Date(lastUpdated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}. ${error}`
+          : "Refreshing the saved evidence for this selection…"}
+      </span>
+      {error ? (
+        <button className="text-link" onClick={retry}>
+          <RefreshCw size={12} />
+          Retry now
+        </button>
+      ) : null}
     </div>
   );
 }

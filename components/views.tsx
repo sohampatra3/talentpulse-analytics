@@ -65,6 +65,10 @@ import type {
   TrackingData,
 } from "@/lib/types";
 import { AnalystChart, ExperimentBars, ProductTrend } from "./charts";
+import { ConnectorStudio, ExternalEvidence } from "./connectors";
+import { ModelPicker, useWorkspace } from "./workspace";
+import { DatasetReadiness } from "./uploads";
+import { RoleEvidence } from "./role-evidence";
 import {
   ActionFeedback,
   EmptyState,
@@ -76,6 +80,7 @@ import {
   Panel,
   PanelHeading,
   Pill,
+  RequestStatus,
 } from "./ui";
 
 export type ViewName =
@@ -128,15 +133,13 @@ function Insights({
 }
 
 export function OverviewView({ filters, navigate }: ViewProps) {
-  const { data, loading, error, retry } = useApi<OverviewData>(
-    "/overview",
-    filters,
-  );
+  const { data, loading, refreshing, error, retry, lastUpdated } =
+    useApi<OverviewData>("/overview", filters);
   const [metric, setMetric] = useState<
     "searches" | "applications" | "completion_rate"
   >("searches");
   if (loading) return <LoadingState />;
-  if (error || !data)
+  if (!data)
     return (
       <ErrorState
         message={error || "The analytics service did not return a response."}
@@ -145,6 +148,12 @@ export function OverviewView({ filters, navigate }: ViewProps) {
     );
   return (
     <>
+      <RequestStatus
+        refreshing={refreshing}
+        error={error}
+        retry={retry}
+        lastUpdated={lastUpdated}
+      />
       <section className="hero-panel panel">
         <div>
           <div className="eyebrow">Your product intelligence workspace</div>
@@ -325,10 +334,15 @@ export function OverviewView({ filters, navigate }: ViewProps) {
         <div>
           <Database size={12} />
           {data.meta.source || "Neon PostgreSQL"} ·{" "}
-          {formatNumber(data.meta.events)} events in selection
+          {typeof data.meta.events === "number"
+            ? `${formatNumber(data.meta.events)} events in selection`
+            : "Observed uploaded evidence"}
         </div>
         <span>
-          Real queries. Realistic synthetic telemetry.{" "}
+          Real queries.{" "}
+          {data.meta.synthetic
+            ? "Realistic synthetic telemetry."
+            : "Workspace-private uploaded evidence."}{" "}
           <span className="hide-mobile">Built for product decisions.</span>
         </span>
       </div>
@@ -371,12 +385,22 @@ function ArmName({ arm }: { arm: ExperimentArm }) {
 }
 
 export function ExperimentsView({ filters, navigate }: ViewProps) {
-  const { data, loading, error, retry } = useApi<ExperimentsData>(
-    "/experiments",
-    filters,
-  );
+  const workspace = useWorkspace();
+  const supportsExperiments =
+    !workspace.dataset || workspace.dataset.readiness.experiments !== false;
+  const { data, loading, refreshing, error, retry, lastUpdated } =
+    useApi<ExperimentsData>("/experiments", filters, supportsExperiments);
+  if (!supportsExperiments)
+    return (
+      <>
+        <DatasetReadiness view="experiments" onOpen={workspace.openUploads} />
+        <LiveSearch filters={filters} navigate={navigate} />
+        <RoleEvidence filters={filters} />
+        <ExternalEvidence filters={filters} />
+      </>
+    );
   if (loading) return <LoadingState />;
-  if (error || !data)
+  if (!data)
     return (
       <ErrorState
         message={error || "Experiment results are unavailable."}
@@ -385,31 +409,63 @@ export function ExperimentsView({ filters, navigate }: ViewProps) {
     );
   return (
     <>
+      <RequestStatus
+        refreshing={refreshing}
+        error={error}
+        retry={retry}
+        lastUpdated={lastUpdated}
+      />
       <div className="experiment-summary">
         <div className="experiment-summary-icon">
           <FlaskConical size={19} />
         </div>
         <div className="experiment-summary-copy">
-          <h3>Can AI ranking help more candidates apply?</h3>
+          <h3>
+            {filters.dataset_id
+              ? "What do the uploaded arm outcomes support?"
+              : "Can AI ranking help more candidates apply?"}
+          </h3>
           <p>
-            Three randomized arms. One fixed observation window. Compare{" "}
-            <strong>user-level application conversion</strong> with cost, speed,
-            and errors.
+            {filters.dataset_id ? (
+              "Observed uploaded outcomes, explicit denominators, and declared assignment provenance. Missing guardrails remain unavailable."
+            ) : (
+              <>
+                Three randomized arms. One fixed observation window. Compare{" "}
+                <strong>user-level application conversion</strong> with cost,
+                speed, and errors.
+              </>
+            )}
           </p>
         </div>
         <Pill tone="green" dot>
-          21 Sep — 4 Oct 2026
+          {filters.dataset_id
+            ? `${formatDate(apiFilters(filters).start_date, true)} — ${formatDate(apiFilters(filters).end_date, true)}`
+            : "21 Sep — 4 Oct 2026"}
         </Pill>
       </div>
       <Panel>
         <PanelHeading
-          eyebrow="Historical experiment · synthetic outcomes"
+          eyebrow={
+            filters.dataset_id
+              ? "Private uploaded experiment evidence"
+              : "Historical experiment · synthetic outcomes"
+          }
           title="Manual search vs. AI recommendations"
-          description="Primary metric: users who submitted an application / exposed users"
+          description={
+            filters.dataset_id
+              ? data.primary_metric ||
+                "Uploaded outcome conversion with the supplied denominator"
+              : "Primary metric: users who submitted an application / exposed users"
+          }
           action={
             <ExportButton
-              url={`/api/export/experiments?${filterQuery(filters)}`}
+              url={
+                filters.dataset_id
+                  ? `/api/uploads/${filters.dataset_id}/export`
+                  : `/api/export/experiments?${filterQuery(filters)}`
+              }
               label="CSV"
+              authenticated={Boolean(filters.dataset_id)}
             />
           }
         />
@@ -487,9 +543,9 @@ export function ExperimentsView({ filters, navigate }: ViewProps) {
           </table>
         </div>
         <Note>
-          Two comparisons against control. Holm-adjusted p-values and
-          simultaneous 95% lift intervals. Repeated sessions never count as
-          independent users.
+          {filters.dataset_id
+            ? "Adjusted p-values and lift intervals are displayed only when supplied assignment provenance permits an inferential readout. User declarations are not independently audited."
+            : "Two comparisons against control. Holm-adjusted p-values and simultaneous 95% lift intervals. Repeated sessions never count as independent users."}
         </Note>
       </Panel>
       <div className="two-column equal-column" style={{ marginTop: 19 }}>
@@ -500,8 +556,9 @@ export function ExperimentsView({ filters, navigate }: ViewProps) {
           />
           <ExperimentBars data={data.arms} />
           <Note>
-            Historical synthetic experiment; these rates do not evaluate live
-            model responses.
+            {filters.dataset_id
+              ? "Uploaded arm outcomes and supplied denominators. These rates remain separate from live model responses."
+              : "Historical synthetic experiment; these rates do not evaluate live model responses."}
           </Note>
         </Panel>
         <Panel>
@@ -518,16 +575,24 @@ export function ExperimentsView({ filters, navigate }: ViewProps) {
                 <p>Assigned-user allocation against equal split</p>
               </div>
               <Pill tone={data.srm.mismatch ? "amber" : "green"}>
-                {data.srm.status}
+                {data.srm.status.replaceAll("_", " ")}
               </Pill>
             </div>
             <div className="quality-check">
               <Users size={16} />
               <div>
                 <strong>Unit of analysis</strong>
-                <p>Randomized and measured at candidate level</p>
+                <p>
+                  {filters.dataset_id
+                    ? "Assignment grain supplied in the uploaded evidence"
+                    : "Randomized and measured at candidate level"}
+                </p>
               </div>
-              <span>User</span>
+              <span>
+                {filters.dataset_id
+                  ? data.analysis_unit?.replaceAll("_", " ") || "Not declared"
+                  : "User"}
+              </span>
             </div>
             <div className="quality-check">
               <Target size={16} />
@@ -559,6 +624,12 @@ export function ExperimentsView({ filters, navigate }: ViewProps) {
           description="Operational tradeoffs across the same experiment population"
         />
         <div className="panel-content">
+          {!data.guardrails.length ? (
+            <EmptyState
+              title="Guardrails not supplied"
+              description="Add observed latency, application errors, and model costs to evaluate operational tradeoffs."
+            />
+          ) : null}
           <div className="guardrail-grid">
             {data.guardrails.map((guardrail) => (
               <div className="guardrail" key={guardrail.variant}>
@@ -588,8 +659,15 @@ export function ExperimentsView({ filters, navigate }: ViewProps) {
           </div>
         </div>
         <Note>{data.filter_note}</Note>
+        {filters.dataset_id
+          ? data.limitations?.map((limitation) => (
+              <Note key={limitation}>{limitation}</Note>
+            ))
+          : null}
       </Panel>
       <LiveSearch filters={filters} navigate={navigate} />
+      <RoleEvidence filters={filters} />
+      <ExternalEvidence filters={filters} />
     </>
   );
 }
@@ -601,7 +679,12 @@ function LiveSearch({
   filters: Filters;
   navigate: (view: ViewName) => void;
 }) {
-  const { data: models } = useApi<ModelsData>("/ai/models");
+  const workspace = useWorkspace();
+  const models = workspace.models;
+  const [searchModels, setSearchModels] = useState({
+    openrouter: "",
+    ollama: "",
+  });
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<SearchResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -613,14 +696,25 @@ function LiveSearch({
     setError(null);
     try {
       setResult(
-        await apiFetch<SearchResult>("/search/compare", {
-          method: "POST",
-          body: JSON.stringify({
-            query: query.trim(),
-            market: filters.market === "all" ? undefined : filters.market,
-            limit: 3,
-          }),
-        }),
+        await apiFetch<SearchResult>(
+          "/search/compare",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              query: query.trim(),
+              market: filters.market === "all" ? undefined : filters.market,
+              limit: 3,
+              dataset_id: filters.dataset_id,
+              models: {
+                openrouter:
+                  searchModels.openrouter ||
+                  models?.defaults?.search.openrouter,
+                ollama: searchModels.ollama || models?.defaults?.search.ollama,
+              },
+            }),
+          },
+          45_000,
+        ),
       );
     } catch (failure) {
       setError(
@@ -638,8 +732,11 @@ function LiveSearch({
         <div>
           <h2>Try the search experience</h2>
           <p>
-            Live SQL retrieval and real model ranking, using the same synthetic
-            job catalog.
+            Live retrieval and real model ranking, using the same{" "}
+            {workspace.datasetId
+              ? "private uploaded job catalog"
+              : "synthetic job catalog"}
+            .
           </p>
         </div>
         <Pill tone="blue">
@@ -649,6 +746,30 @@ function LiveSearch({
       <Panel>
         <div className="panel-content">
           <form onSubmit={compare}>
+            <div className="model-selection-row">
+              <ModelPicker
+                provider="openrouter"
+                purpose="search"
+                value={searchModels.openrouter}
+                onChange={(value) =>
+                  setSearchModels((previous) => ({
+                    ...previous,
+                    openrouter: value,
+                  }))
+                }
+              />
+              <ModelPicker
+                provider="ollama"
+                purpose="search"
+                value={searchModels.ollama}
+                onChange={(value) =>
+                  setSearchModels((previous) => ({
+                    ...previous,
+                    ollama: value,
+                  }))
+                }
+              />
+            </div>
             <label className="eyebrow" htmlFor="job-query">
               What would your next role look like?
             </label>
@@ -665,7 +786,13 @@ function LiveSearch({
               <button
                 type="submit"
                 className="button primary"
-                disabled={busy || !query.trim()}
+                disabled={
+                  busy ||
+                  !query.trim() ||
+                  Boolean(
+                    workspace.dataset && !workspace.dataset.readiness.jobs,
+                  )
+                }
               >
                 {busy ? (
                   <LoaderCircle size={14} className="spin" />
@@ -691,6 +818,9 @@ function LiveSearch({
             ))}
           </div>
           <p className="control-caption">
+            {workspace.dataset && !workspace.dataset.readiness.jobs
+              ? "This upload does not contain a searchable job catalog. Select a jobs upload or synthetic telemetry to try model ranking. "
+              : ""}
             Market follows your active filter. A successful live call verifies
             provider connectivity. Historical experiment results remain
             separate.
@@ -724,12 +854,20 @@ function SearchArmCard({
   arm: SearchResult["arms"][number];
   navigate: (view: ViewName) => void;
 }) {
-  const label =
-    arm.id === "gpt4o"
-      ? "GPT-4o recommendation"
-      : arm.id === "ollama"
-        ? "GPT-OSS 120B recommendation"
-        : arm.label;
+  const workspace = useWorkspace();
+  const catalogLabel = workspace.models?.catalog?.find(
+    (model) => model.id === arm.model && model.provider === arm.provider,
+  )?.label;
+  const modelLabel =
+    catalogLabel ||
+    (arm.model?.includes("gpt-4o")
+      ? "GPT-4o"
+      : arm.model?.startsWith("gpt-oss:120b")
+        ? "GPT-OSS 120B"
+        : arm.model?.startsWith("gemma4:31b")
+          ? "Gemma 4 31B"
+          : arm.model);
+  const label = arm.model ? `${modelLabel} recommendation` : arm.label;
   const notCalled =
     arm.latency_ms === null ||
     ["not_configured", "rate_limited", "no_candidates"].includes(arm.status);
@@ -846,7 +984,7 @@ export function FunnelView({ filters, navigate }: ViewProps) {
     sessions: "Search sessions",
   };
   if (funnel.loading) return <LoadingState />;
-  if (funnel.error || !funnel.data)
+  if (!funnel.data)
     return (
       <ErrorState
         message={funnel.error || "Funnel data is unavailable."}
@@ -856,6 +994,12 @@ export function FunnelView({ filters, navigate }: ViewProps) {
   const data = funnel.data;
   return (
     <>
+      <RequestStatus
+        refreshing={funnel.refreshing}
+        error={funnel.error}
+        retry={funnel.retry}
+        lastUpdated={funnel.lastUpdated}
+      />
       <div className="metrics-grid">
         <Metric
           label="Search-to-application conversion"
@@ -1042,12 +1186,10 @@ export function FunnelView({ filters, navigate }: ViewProps) {
 }
 
 export function ReleasesView({ filters }: ViewProps) {
-  const { data, loading, error, retry } = useApi<ReleaseData>(
-    "/releases",
-    filters,
-  );
+  const { data, loading, refreshing, error, retry, lastUpdated } =
+    useApi<ReleaseData>("/releases", filters);
   if (loading) return <LoadingState />;
-  if (error || !data)
+  if (!data)
     return (
       <ErrorState
         message={error || "Release impact data is unavailable."}
@@ -1056,6 +1198,12 @@ export function ReleasesView({ filters }: ViewProps) {
     );
   return (
     <>
+      <RequestStatus
+        refreshing={refreshing}
+        error={error}
+        retry={retry}
+        lastUpdated={lastUpdated}
+      />
       <Panel className="notice-panel">
         <Info size={15} />
         <div>{data.disclaimer}</div>
@@ -1102,8 +1250,10 @@ export function ReleasesView({ filters }: ViewProps) {
             </li>
           </ul>
           <div className="control-caption" style={{ marginTop: 24 }}>
-            Completion = submitted applications / application starts. Historical
-            releases and telemetry are synthetic.
+            Completion = submitted applications / application starts.{" "}
+            {filters.dataset_id
+              ? "Release comparisons use the selected uploaded observations."
+              : "Historical releases and telemetry are synthetic."}
           </div>
         </Panel>
       </div>
@@ -1216,9 +1366,11 @@ const csvCell = (value: unknown) =>
   `"${String(value ?? "").replaceAll('"', '""')}"`;
 
 export function AnalystView({ filters }: ViewProps) {
-  const { data: models } = useApi<ModelsData>("/ai/models");
+  const workspace = useWorkspace();
+  const models = workspace.models;
   const [question, setQuestion] = useState("");
   const [provider, setProvider] = useState("openrouter");
+  const [selectedModel, setSelectedModel] = useState("");
   const [answer, setAnswer] = useState<AnalystAnswer | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1250,15 +1402,21 @@ export function AnalystView({ filters }: ViewProps) {
     setError(null);
     setFeedback("");
     try {
-      const response = await apiFetch<AnalystAnswer>("/ai/investigate", {
-        method: "POST",
-        body: JSON.stringify({
-          question: question.trim(),
-          visualize: true,
-          provider,
-          filters: apiFilters(filters),
-        }),
-      });
+      const response = await apiFetch<AnalystAnswer>(
+        "/ai/investigate",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            question: question.trim(),
+            visualize: true,
+            provider,
+            model: selectedModel || undefined,
+            dataset_id: filters.dataset_id,
+            filters: apiFilters(filters),
+          }),
+        },
+        45_000,
+      );
       setAnswer(response);
       setLastQuestion(question.trim());
     } catch (failure) {
@@ -1365,11 +1523,21 @@ export function AnalystView({ filters }: ViewProps) {
               <select
                 aria-label="AI analyst provider"
                 value={provider}
-                onChange={(event) => setProvider(event.target.value)}
+                onChange={(event) => {
+                  setProvider(event.target.value);
+                  setSelectedModel("");
+                }}
               >
                 <option value="openrouter">GPT-4o · OpenRouter</option>
                 <option value="ollama">GPT-OSS 120B · Ollama</option>
               </select>
+              <ModelPicker
+                provider={provider}
+                purpose="analyst"
+                value={selectedModel}
+                onChange={setSelectedModel}
+                label="Interpretation model"
+              />
               <button
                 className="button primary"
                 disabled={busy || !question.trim()}
@@ -1412,7 +1580,11 @@ export function AnalystView({ filters }: ViewProps) {
             {answer.chart ? (
               <div ref={chartRef}>
                 <PanelHeading
-                  eyebrow="Chart draft · synthetic data"
+                  eyebrow={
+                    answer.synthetic
+                      ? "Chart draft · synthetic data"
+                      : "Chart draft · uploaded evidence"
+                  }
                   title={answer.chart.title}
                 />
                 <AnalystChart chart={answer.chart} />
@@ -1496,7 +1668,9 @@ export function AnalystView({ filters }: ViewProps) {
           </h3>
           <div className="context-line">
             <span>Dataset</span>
-            <strong>Synthetic telemetry</strong>
+            <strong>
+              {workspace.dataset ? "Private upload" : "Synthetic telemetry"}
+            </strong>
           </div>
           <div className="context-line">
             <span>Period</span>
@@ -1587,9 +1761,10 @@ const CONNECTION_ICONS: Record<string, React.ReactNode> = {
 };
 
 export function ConnectionsView({ filters }: ViewProps) {
+  const workspace = useWorkspace();
   const integrations = useApi<IntegrationData>("/integrations");
   const quality = useApi<QualityData>("/data-quality", filters);
-  const tracking = useApi<TrackingData>("/tracking-plan");
+  const tracking = useApi<TrackingData>("/tracking-plan", filters);
   const [modal, setModal] = useState<Integration | "mcp" | null>(null);
   const [feedback, setFeedback] = useState("");
   const [embedUrl, setEmbedUrl] = useState("");
@@ -1599,10 +1774,10 @@ export function ConnectionsView({ filters }: ViewProps) {
   const [adobeResult, setAdobeResult] = useState("");
   const [selectedTracking, setSelectedTracking] = useState<string | null>(null);
   useEffect(() => {
-    try {
-      setEmbedUrl(localStorage.getItem("talentpulse.powerbi.v1") || "");
-    } catch {}
-  }, []);
+    const saved = workspace.connectors.find((item) => item.id === "powerbi")
+      ?.settings.embed_url;
+    if (typeof saved === "string") setEmbedUrl(saved);
+  }, [workspace.connectors]);
   useEffect(() => {
     if (!modal) return;
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -1644,7 +1819,7 @@ export function ConnectionsView({ filters }: ViewProps) {
       setAdobeBusy(false);
     }
   }
-  function embed(event: React.FormEvent) {
+  async function embed(event: React.FormEvent) {
     event.preventDefault();
     setEmbedError("");
     try {
@@ -1661,10 +1836,15 @@ export function ConnectionsView({ filters }: ViewProps) {
         )
       )
         throw new Error();
+      await apiFetch("/workspace/connectors/powerbi", {
+        method: "PUT",
+        body: JSON.stringify({
+          settings: { embed_url: parsed.toString() },
+          secrets: {},
+        }),
+      });
       setActiveEmbed(parsed.toString());
-      try {
-        localStorage.setItem("talentpulse.powerbi.v1", parsed.toString());
-      } catch {}
+      workspace.refreshConnectors();
     } catch {
       setEmbedError(
         "Enter a valid HTTPS report embed URL from app.powerbi.com or app.powerbigov.us without credentials or API tokens.",
@@ -1682,7 +1862,7 @@ export function ConnectionsView({ filters }: ViewProps) {
     }
   }
   if (integrations.loading) return <LoadingState />;
-  if (integrations.error || !integrations.data)
+  if (!integrations.data)
     return (
       <ErrorState
         message={integrations.error || "Integration status is unavailable."}
@@ -1692,6 +1872,18 @@ export function ConnectionsView({ filters }: ViewProps) {
   const data = integrations.data;
   return (
     <>
+      <RequestStatus
+        refreshing={integrations.refreshing}
+        error={integrations.error}
+        retry={integrations.retry}
+        lastUpdated={integrations.lastUpdated}
+      />
+      <ConnectorStudio />
+      <ExternalEvidence filters={filters} />
+      <div className="section-label">
+        <h2>Shared deployment defaults</h2>
+        <span>Private settings override these for your workspace</span>
+      </div>
       <div className="connections-grid">
         {data.integrations.map((integration) => (
           <Panel className="connection-card" key={integration.id}>
@@ -1803,23 +1995,31 @@ export function ConnectionsView({ filters }: ViewProps) {
         </Panel>
         <Panel>
           <PanelHeading
-            title="Data you can trust"
-            description="Quality checks run against the selected telemetry"
+            title={
+              filters.dataset_id
+                ? "Readiness of the uploaded evidence"
+                : "Data you can trust"
+            }
+            description="Checks run against the selected data source"
             action={
               <Pill
                 tone={
-                  quality.data?.event_volume === 0
+                  filters.dataset_id
                     ? "neutral"
-                    : quality.data && quality.data.score >= 95
-                      ? "green"
-                      : "amber"
+                    : quality.data?.event_volume === 0
+                      ? "neutral"
+                      : quality.data && quality.data.score >= 95
+                        ? "green"
+                        : "amber"
                 }
               >
                 {quality.loading
                   ? "Checking…"
-                  : quality.data?.event_volume === 0
-                    ? "No evidence"
-                    : `${formatNumber(quality.data?.score, 1)} / 100`}
+                  : filters.dataset_id
+                    ? "Observed coverage"
+                    : quality.data?.event_volume === 0
+                      ? "No evidence"
+                      : `${formatNumber(quality.data?.score, 1)} / 100`}
               </Pill>
             }
           />
@@ -1865,8 +2065,14 @@ export function ConnectionsView({ filters }: ViewProps) {
           </div>
           {quality.data ? (
             <Note>
-              {formatNumber(quality.data.event_volume)} events ·{" "}
-              {formatNumber(quality.data.session_volume)} sessions examined
+              {filters.dataset_id ? (
+                "Mapped-field coverage is observed; no overall quality score is invented."
+              ) : (
+                <>
+                  {formatNumber(quality.data.event_volume)} events ·{" "}
+                  {formatNumber(quality.data.session_volume)} sessions examined
+                </>
+              )}
             </Note>
           ) : null}
         </Panel>
@@ -1944,8 +2150,8 @@ export function ConnectionsView({ filters }: ViewProps) {
             </div>
           ) : null}
           <p className="control-caption">
-            The report URL stays in this browser. API credentials are configured
-            on the server.
+            The report URL is saved in your private workspace. API credentials
+            remain encrypted on the server.
           </p>
         </Panel>
       </div>

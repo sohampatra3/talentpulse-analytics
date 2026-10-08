@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   Menu,
   Moon,
+  Palette,
   MonitorSmartphone,
   Plug,
   Rocket,
@@ -20,9 +21,11 @@ import {
   Sparkles,
   Sun,
   Users,
+  UploadCloud,
 } from "lucide-react";
 import {
   apiFilters,
+  downloadApi,
   DEFAULT_FILTERS,
   filterQuery,
   formatDate,
@@ -40,6 +43,8 @@ import {
   type ViewName,
 } from "./views";
 import { Pill } from "./ui";
+import { WorkspaceProvider, useWorkspace } from "./workspace";
+import { DatasetReadiness, UploadsDialog } from "./uploads";
 
 const NAVIGATION = [
   {
@@ -105,16 +110,26 @@ function Brand() {
 }
 
 export default function TalentPulse() {
+  return (
+    <WorkspaceProvider>
+      <TalentPulseWorkspace />
+    </WorkspaceProvider>
+  );
+}
+
+function TalentPulseWorkspace() {
+  const workspace = useWorkspace();
   const [view, setView] = useState<ViewName>("overview");
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [theme, setTheme] = useState("light");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const { data: options } = useApi<FilterOptions>("/filters");
   const { data: health } = useApi<{
     status: string;
     database: string;
     synthetic: boolean;
-  }>("/health");
+  }>("/health/database");
   useEffect(() => {
     setTheme(document.documentElement.dataset.theme || "light");
     const readHash = () => {
@@ -143,12 +158,48 @@ export default function TalentPulse() {
     setFilters((previous) => ({ ...previous, [key]: value }));
   }
   const current = NAVIGATION.find((item) => item.id === view)!;
-  const dates = apiFilters(filters);
+  const effectiveFilters: Filters = {
+    ...filters,
+    dataset_id: workspace.datasetId || undefined,
+    range_start: workspace.dataset?.date_range?.start_date,
+    range_end: workspace.dataset?.date_range?.end_date,
+  };
+  const availableOptions = workspace.dataset?.filter_options || options;
+  const dates = apiFilters(effectiveFilters);
+  const adobe = workspace.connectors.find(
+    (connector) => connector.id === "adobe",
+  );
+  const adobeState = workspace.connectorsError
+    ? "status unavailable"
+    : workspace.connectorsLoading
+      ? "checking"
+      : adobe?.status === "verified" || adobe?.last_result?.verified
+        ? "verified"
+        : adobe?.status === "error"
+          ? "connection error"
+          : adobe?.status === "not_configured"
+            ? "disconnected"
+            : adobe?.configured
+              ? "configured, unverified"
+              : "disconnected";
+  const sourceName = workspace.datasetId
+    ? `upload: ${workspace.dataset?.name || "selected dataset"}`
+    : "synthetic data";
+  const readinessKey = view === "analyst" ? "ai" : view;
+  const unsupported = Boolean(
+    workspace.dataset &&
+    workspace.dataset.readiness[readinessKey] === false &&
+    view !== "connections" &&
+    view !== "experiments",
+  );
+  useEffect(() => {
+    setFilters({ ...DEFAULT_FILTERS, days: workspace.datasetId ? "56" : "28" });
+  }, [workspace.datasetId]);
   const segmented =
     filters.market !== "all" ||
     filters.device !== "all" ||
     filters.user_type !== "all";
-  const props = { filters, navigate };
+  const props = { filters: effectiveFilters, navigate };
   return (
     <div className="app-shell">
       <button
@@ -163,8 +214,8 @@ export default function TalentPulse() {
             <LayersIcon />
           </div>
           <div>
-            <strong>Job discovery</strong>
-            <small>Product analytics workspace</small>
+            <strong>AI-enabled product analytics workspace</strong>
+            <small>Job discovery · evidence & experiments</small>
           </div>
           <ChevronDown size={12} />
         </div>
@@ -222,9 +273,17 @@ export default function TalentPulse() {
             <strong>{current.label}</strong>
           </div>
           <div className="topbar-actions">
-            <Pill tone="green" dot>
-              Synthetic dataset
-            </Pill>
+            <span
+              className="source-status-badge"
+              title={`Adobe Analytics ${adobeState} · ${sourceName}`}
+            >
+              <Database size={12} />
+              <span>
+                Adobe Analytics {adobeState}
+                <i> · </i>
+                {sourceName}
+              </span>
+            </span>
             <div className="theme-button" aria-label="Appearance">
               <button
                 className={theme === "light" ? "selected" : ""}
@@ -242,6 +301,14 @@ export default function TalentPulse() {
               >
                 <Moon size={12} />
               </button>
+              <button
+                className={theme === "amber" ? "selected" : ""}
+                onClick={() => toggleTheme("amber")}
+                aria-label="Warm amber dark mode"
+                aria-pressed={theme === "amber"}
+              >
+                <Palette size={13} />
+              </button>
             </div>
           </div>
         </header>
@@ -253,15 +320,39 @@ export default function TalentPulse() {
               <p className="page-description">{current.description}</p>
             </div>
             <div className="title-actions">
-              <a
+              <button
                 className="button subtle"
-                href={`/api/export/daily?${filterQuery(filters)}`}
-                download
-                aria-label="Export daily analytics CSV"
+                onClick={workspace.openUploads}
+                aria-label="Upload CSV or Excel data"
               >
-                <Download size={14} />
-                <span>Export data</span>
-              </a>
+                <UploadCloud size={14} />
+                <span>Upload CSV / Excel</span>
+              </button>
+              {workspace.datasetId ? (
+                <button
+                  className="button subtle"
+                  onClick={() =>
+                    downloadApi(
+                      `/uploads/${workspace.datasetId}/export`,
+                      "talentpulse-upload.csv",
+                    ).catch((error) => setExportError(error.message))
+                  }
+                  aria-label="Export selected uploaded dataset"
+                >
+                  <Download size={14} />
+                  <span>Export data</span>
+                </button>
+              ) : (
+                <a
+                  className="button subtle"
+                  href={`/api/export/daily?${filterQuery(effectiveFilters)}`}
+                  download
+                  aria-label="Export daily analytics CSV"
+                >
+                  <Download size={14} />
+                  <span>Export data</span>
+                </a>
+              )}
               {view !== "analyst" ? (
                 <button
                   className="button primary"
@@ -274,6 +365,38 @@ export default function TalentPulse() {
               ) : null}
             </div>
           </div>
+          <div className="dataset-toolbar">
+            <label>
+              <Database size={14} />
+              <span>Analysis dataset</span>
+              <select
+                aria-label="Analysis dataset"
+                value={workspace.datasetId || "synthetic"}
+                onChange={(event) =>
+                  workspace.selectDataset(
+                    event.target.value === "synthetic"
+                      ? null
+                      : event.target.value,
+                  )
+                }
+              >
+                <option value="synthetic">Synthetic product telemetry</option>
+                {workspace.datasets.map((dataset) => (
+                  <option key={dataset.dataset_id} value={dataset.dataset_id}>
+                    {dataset.name} · {dataset.row_count.toLocaleString()} rows
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button className="text-link" onClick={workspace.openUploads}>
+              Browse & inspect uploads <ChevronRight size={12} />
+            </button>
+          </div>
+          {exportError ? (
+            <div className="inline-error" role="alert">
+              {exportError}
+            </div>
+          ) : null}
           <div className="filter-bar" aria-label="Shared analytics filters">
             <div className="filter-control">
               <CalendarDays />
@@ -295,7 +418,7 @@ export default function TalentPulse() {
                 onChange={(event) => filter("market", event.target.value)}
               >
                 <option value="all">All markets</option>
-                {options?.markets.map((market) => (
+                {availableOptions?.markets.map((market) => (
                   <option key={market} value={market}>
                     {market}
                   </option>
@@ -310,7 +433,7 @@ export default function TalentPulse() {
                 onChange={(event) => filter("device", event.target.value)}
               >
                 <option value="all">All devices</option>
-                {options?.devices.map((device) => (
+                {availableOptions?.devices.map((device) => (
                   <option key={device} value={device}>
                     {device.replaceAll("_", " ")}
                   </option>
@@ -325,7 +448,7 @@ export default function TalentPulse() {
                 onChange={(event) => filter("user_type", event.target.value)}
               >
                 <option value="all">All candidates</option>
-                {options?.user_types.map((type) => (
+                {availableOptions?.user_types.map((type) => (
                   <option key={type} value={type}>
                     {type.replaceAll("_", " ")}
                   </option>
@@ -349,10 +472,15 @@ export default function TalentPulse() {
             ) : null}
             <span className="filter-date">
               {formatDate(dates.start_date, true)} —{" "}
-              {formatDate(dates.end_date, true)} 2026
+              {formatDate(dates.end_date, true)} {dates.end_date.slice(0, 4)}
             </span>
           </div>
-          {view === "overview" ? (
+          {unsupported ? (
+            <DatasetReadiness
+              view={readinessKey}
+              onOpen={workspace.openUploads}
+            />
+          ) : view === "overview" ? (
             <OverviewView {...props} />
           ) : view === "experiments" ? (
             <ExperimentsView {...props} />
@@ -378,6 +506,7 @@ export default function TalentPulse() {
           </div>
         </main>
       </div>
+      <UploadsDialog />
     </div>
   );
 }

@@ -85,7 +85,18 @@ def overview(filters: Filters) -> dict:
     current_complete = bool(bounds.get("start_date") and bounds["start_date"] <= str(filters.start_date) and bounds["end_date"] >= str(filters.end_date))
     comparison_complete = previous_complete and current_complete
     where, params = filters.sql()
-    event_count = row(f"SELECT COUNT(*) AS n FROM talentpulse.fact_events e JOIN talentpulse.fact_sessions s USING(session_id) WHERE {where}", params)["n"]
+    if not any(getattr(filters, name) for name in ("user_type", "job_category", "experience_level")):
+        # These dimensions are copied onto every synthetic event by the seed
+        # ingestion contract. Counting their exact rows avoids a million-row join.
+        event_where = ["e.date BETWEEN %s AND %s"]
+        event_params = [filters.start_date, filters.end_date]
+        for field, column in (("market", "market"), ("device_type", "device_type"), ("traffic_source", "traffic_source"), ("variant", "experiment_variant")):
+            if getattr(filters, field):
+                event_where.append(f"e.{column}=%s")
+                event_params.append(getattr(filters, field))
+        event_count = row("SELECT COUNT(*) AS n FROM talentpulse.fact_events e WHERE " + " AND ".join(event_where), event_params)["n"]
+    else:
+        event_count = row(f"SELECT COUNT(*) AS n FROM talentpulse.fact_events e JOIN talentpulse.fact_sessions s USING(session_id) WHERE {where}", params)["n"]
     definitions = (
         ("sessions", "Search sessions", "number", "Sessions that entered the job-search journey."),
         ("applications", "Completed applications", "number", "Applications submitted, attributed to the originating search session."),
@@ -167,3 +178,28 @@ def releases(filters: Filters) -> dict:
         error_change = round(after.get("error_rate", 0) - before.get("error_rate", 0), 3) if sessions_adequate else None
         result.append({"id": release["release_id"], "name": release["release_name"], "feature": release["feature"], "release_date": release["release_date"], "market": release["market"], "platform": release["platform"], "before": before, "after": after, "impact_pp": impact, "impact_metric": "application_completion_rate", "error_change_pp": error_change, "relative_lift_pct": round(100 * impact / before["completion_rate"], 2) if adequate and before["completion_rate"] else None, "latency_change_ms": round(after["latency_ms"] - before["latency_ms"], 1) if sessions_adequate else None, "before_window": before_filters.window(), "after_window": after_filters.window(), "window_days": window_days, "confidence": "Observational association" if adequate else "Insufficient baseline", "interpretation": f"Application completion (submissions / starts) changed {impact:+.2f} percentage points. Seasonality, traffic mix and experiment exposure can confound this before/after comparison." if adequate else "At least one period has no application starts. An application-completion impact cannot be estimated for this selection."})
     return {"meta": meta(filters), "releases": result, "disclaimer": "Before/after comparisons show association. They are not causal release attribution; use randomized experiments for a causal claim."}
+
+
+@read_transaction
+def job_role_drivers(filters: Filters, role: str | None = None) -> dict:
+    where, params = filters.sql()
+    options = rows(f"SELECT DISTINCT j.job_title FROM talentpulse.fact_sessions s JOIN talentpulse.dim_jobs j USING(job_id) WHERE {where} ORDER BY j.job_title", params)
+    if role and role.lower() == "all":
+        role = None
+    if role:
+        where += " AND j.job_title=%s"
+        params = (*params, role)
+    summary = row(f"SELECT {AGGREGATE_SQL},COUNT(DISTINCT s.user_id) AS unique_users FROM talentpulse.fact_sessions s JOIN talentpulse.dim_jobs j USING(job_id) WHERE {where}", params)
+    arm_rows = rows(f"SELECT s.variant AS arm,{AGGREGATE_SQL} FROM talentpulse.fact_sessions s JOIN talentpulse.dim_jobs j USING(job_id) WHERE {where} GROUP BY s.variant ORDER BY s.variant", params)
+    labels = {"control": "Manual SQL search", "gpt4o": "GPT-4o recommendation", "ollama": "GPT-OSS 120B recommendation"}
+    arms = []
+    for item in arm_rows:
+        item = complete_aggregate(item)
+        item.update(label=labels.get(item["arm"], item["arm"]), users=None, exposed_users=None, significant=False, p_value=None, lift_pct=None, ci_low=None, ci_high=None, decision="Descriptive role association", cost_usd=item["model_cost_usd"])
+        arms.append(item)
+    drivers = []
+    for dimension in ("device_type", "market", "traffic_source", "experience_level", "job_category"):
+        data = rows(f"SELECT s.{dimension} AS name,{AGGREGATE_SQL} FROM talentpulse.fact_sessions s JOIN talentpulse.dim_jobs j USING(job_id) WHERE {where} GROUP BY s.{dimension} ORDER BY sessions DESC", params)
+        groups = [{**complete_aggregate(item), "label": item["name"], "metric_value": percentage(item["applications"], item["sessions"])} for item in data]
+        drivers.append({"factor": dimension, "groups": groups, "interpretation": "Observed session-level association. Role choice and cohort mix can occur after assignment; this comparison does not identify a causal driver."})
+    return {"meta": meta(filters), "role": role, "role_options": [item["job_title"] for item in options], "support": {"row_count": summary["sessions"], "session_count": summary["sessions"], "unique_users": summary["unique_users"], "grain": "sessions", "randomized_status": "role_selection_not_randomized", "denominator": "observed search sessions"}, "arms": arms, "drivers": drivers, "limitations": ["Role-specific conversion is descriptive and uses sessions, unlike the main experiment's fixed user-level outcome.", "Selection into a job role can be affected by treatment. No role-specific winner, significance, or causal explanation is inferred.", "All base telemetry is synthetic; it is not actual StepStone performance."], "suggested_experiment": "Pre-register role-relevance hypotheses at user assignment, with a declared conversion denominator and latency/error/cost guardrails."}
