@@ -35,11 +35,13 @@ from api.analytics.workspaces import workspace_identity, connector_config
 from api.analytics.upload_router import router as uploads_router
 from api.analytics.uploads import UploadError
 from api.analytics.feedback import router as feedback_router
+from api.analytics.search_lab import router as search_lab_router
 
-app = FastAPI(title="TalentPulse Analytics Lab", version="1.1.0", description="An independent job-search product analytics portfolio lab with explicitly synthetic history and private uploaded evidence. Analytics, inference and model adapters are implemented in Python.", docs_url="/api/docs", openapi_url="/api/openapi.json", redoc_url=None)
+app = FastAPI(title="TalentPulse Analytics Lab", version="1.2.0", description="An independent job-search product analytics portfolio lab with explicitly synthetic history, reviewed search-quality experiments and private uploaded evidence. Analytics, inference and model adapters are implemented in Python.", docs_url="/api/docs", openapi_url="/api/openapi.json", redoc_url=None)
 app.include_router(connectors_router)
 app.include_router(uploads_router)
 app.include_router(feedback_router)
+app.include_router(search_lab_router)
 
 _cache: dict[str, tuple[float, dict]] = {}
 _cache_lock = threading.Lock()
@@ -69,6 +71,9 @@ def dataset_cache_name(identity: str, dataset_id: str, kind: str, metadata: dict
 
 @app.middleware("http")
 async def validate_mcp_transport(request: Request, call_next):
+    from api.analytics.ai_budget import client_context
+    address=request.headers.get("x-vercel-forwarded-for") if os.getenv("VERCEL") else None
+    context=client_context.set((address or (request.client.host if request.client else "unknown")).split(',')[0].strip())
     if request.url.path == "/api/mcp":
         protocol = request.headers.get("mcp-protocol-version")
         if protocol and protocol not in ("2025-06-18", "2025-03-26"):
@@ -84,7 +89,10 @@ async def validate_mcp_transport(request: Request, call_next):
                 allowed.add("https://" + os.environ["VERCEL_URL"])
             if origin.rstrip("/") not in allowed:
                 return JSONResponse(status_code=403, content={"detail": "Origin is not allowed for this MCP endpoint"})
-    response = await call_next(request)
+    try:
+        response = await call_next(request)
+    finally:
+        client_context.reset(context)
     if request.headers.get("x-workspace-token"):
         response.headers["Cache-Control"] = "private, no-store"
     return response

@@ -27,13 +27,18 @@ MAX_SERIALIZED_BYTES=8000000
 WORKSPACE_PAYLOAD_BUDGET=10000000
 GLOBAL_PAYLOAD_BUDGET=30000000
 KINDS={'auto','jobs','sessions','events','user_outcomes','experiment_summary','generic'}
-BOOL_FIELDS={'search_completed','job_viewed','apply_clicked','application_started','cv_uploaded','application_submitted','application_error','exposed','converted','job_engaged','randomized'}
+BOOL_FIELDS={'search_completed','job_viewed','apply_clicked','application_started','cv_uploaded','application_submitted','application_error','exposed','converted','job_engaged','randomized','active'}
 NUMBER_FIELDS={'salary_min','salary_max','load_time_ms','model_cost_usd','samples','conversions','assigned_users','exposed_users','converted_users'}
 ALIASES={
  'date':['date','session_date','event_date','timestamp','occurred_at','created_at','posted_date'],
  'session_id':['session_id','session','visit_id'], 'user_id':['user_id','user','visitor_id','candidate_id'],
  'job_id':['job_id','job','job_reference'], 'job_title':['job_title','title','role','position'],
  'job_category':['job_category','category','department','job_family'],
+ 'job_description':['job_description','description','requirements','job_details'],
+ 'skills':['skills','required_skills','skill_list'],
+ 'language':['language','working_language','job_language'],
+ 'active':['active','is_active','open'],
+ 'expires_at':['expires_at','expiry_date','expiration_date'],
  'market':['market','country','country_name'], 'location':['location','city','job_location'],
  'device_type':['device_type','device','platform'], 'user_type':['user_type','user_segment','new_returning'],
  'experience_level':['experience_level','seniority','experience'], 'traffic_source':['traffic_source','channel','source'],
@@ -43,7 +48,7 @@ ALIASES={
  'release_date':['release_date'], 'assignment_unit':['assignment_unit','analysis_unit'],
  'samples':['samples','sample_size','exposed_users','users'], 'conversions':['conversions','converted_users','successes'],
  'load_time_ms':['load_time_ms','latency_ms','search_latency_ms'], 'model_cost_usd':['model_cost_usd','cost_usd'],
- **{key:[key] for key in BOOL_FIELDS},
+ **{key:[key] for key in BOOL_FIELDS if key!='active'},
 }
 
 
@@ -158,7 +163,7 @@ def typed_value(field:str,value:Any)->Any:
         if not math.isfinite(number) or number<0:raise UploadError(f'{field} must be finite and non-negative.')
         if field in {'samples','conversions','assigned_users','exposed_users','converted_users'} and not number.is_integer():raise UploadError('Sample and conversion counts must be whole numbers.')
         return int(number) if number.is_integer() else number
-    if field in {'date','release_date'}:
+    if field in {'date','release_date','expires_at'}:
         try:return datetime.fromisoformat(str(value).replace('Z','+00:00')).date().isoformat()
         except ValueError as exc:raise UploadError(f'{field} must use ISO date or timestamp format.') from exc
     return str(value).strip()

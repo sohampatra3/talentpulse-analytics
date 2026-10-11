@@ -64,7 +64,7 @@ def cloud_catalog() -> tuple[list[dict], str]:
                         continue
                     name = item.get("name") if provider == "ollama" else item.get("id")
                     if name and isinstance(name, str) and len(name) < 160:
-                        catalog.append({"provider": provider, "id": name, "label": name if provider == "ollama" else item.get("name", name), "source": url, "available": True, "capabilities": ["chat", "candidate_ranking", "evidence_interpretation"]})
+                        catalog.append({"provider": provider, "id": name, "label": name if provider == "ollama" else item.get("name", name), "source": url, "available": True, "capabilities": ["chat", "candidate_ranking", "evidence_interpretation"], "capability_status": "catalog_text_model; output validated at runtime", "pricing": item.get("pricing"), "context_length": item.get("context_length"), "supported_parameters": item.get("supported_parameters", [])})
                 statuses.append(provider + ":verified_catalog")
             except (httpx.HTTPError, ValueError, TypeError):
                 statuses.append(provider + ":unavailable")
@@ -105,6 +105,10 @@ def models() -> dict:
 
 
 def consume_usage(client_address: str):
+    from .ai_budget import client_context
+    if client_context.get() is not None:
+        # Provider calls reserve individually, including retries and embeddings.
+        return
     policy = usage_policy()
     digest = hashlib.sha256((os.getenv("LAB_HASH_SALT", "talentpulse-demo") + client_address).encode()).hexdigest()
     today = datetime.now(timezone.utc).date()
@@ -127,17 +131,28 @@ async def complete(provider: str, system: str, user: str, json_mode: bool = Fals
     model = model or model_id(provider)
     if provider == "openrouter":
         payload = {"model": model, "messages": messages, "temperature": 0.15, "max_tokens": max_tokens}
-        if json_mode:
+        capabilities=next((m for m in cloud_catalog()[0] if m['provider']==provider and m['id']==model),{})
+        if json_mode and 'response_format' in capabilities.get('supported_parameters',[]):
             payload["response_format"] = {"type": "json_object"}
         headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json", "X-Title": "TalentPulse Analytics Lab"}
     else:
         payload = {"model": model, "messages": messages, "stream": False, "options": {"temperature": 0.15, "num_predict": max_tokens}}
         if model.startswith("gpt-oss:"):
             payload["think"] = "low"
-        if json_mode:
-            payload["format"] = "json"
+            # Reasoning consumes the same generation allowance. Leave room for the final JSON.
+            payload["options"]["num_predict"] = max(max_tokens, 3072)
+        # Cloud does not guarantee schema enforcement. The prompt requests JSON;
+        # callers validate it and report malformed output as a measured failure.
         headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
     started = time.perf_counter()
+    from .ai_budget import client_context, reserve, settle
+    receipt = None
+    if client_context.get() is not None:
+        price = next((m.get("pricing") for m in cloud_catalog()[0] if m["provider"] == provider and m["id"] == model), None)
+        if provider == "openrouter" and not price:
+            raise ProviderFailure("This model has no verified pricing metadata; choose a catalog model before using the shared budget.")
+        upper_cost = (len((system+user).encode())+200)*float((price or {}).get("prompt",0)) + max_tokens*float((price or {}).get("completion",0))
+        receipt = await __import__('asyncio').to_thread(reserve, upper_cost)
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(32, connect=5)) as client:
             response = await client.post(spec["url"], headers=headers, json=payload)
@@ -148,7 +163,10 @@ async def complete(provider: str, system: str, user: str, json_mode: bool = Fals
         if not isinstance(answer, str) or not answer.strip():
             raise ProviderFailure(f"{spec['label']} returned an empty response.")
         cost = content.get("usage", {}).get("cost") if provider == "openrouter" else None
-        return {"content": answer, "provider": provider, "model": model, "latency_ms": round((time.perf_counter() - started) * 1000), "cost_usd": float(cost) if isinstance(cost, (int, float)) else None}
+        usage=content.get("usage",{}) if provider=="openrouter" else {"prompt_tokens":content.get("prompt_eval_count"),"completion_tokens":content.get("eval_count")}
+        if receipt and cost is not None:
+            await __import__('asyncio').to_thread(settle, receipt, cost)
+        return {"content": answer, "provider": provider, "model": model, "latency_ms": round((time.perf_counter() - started) * 1000), "cost_usd": float(cost) if isinstance(cost, (int, float)) else None, "usage": usage, "generation_limit":payload.get('options',{}).get('num_predict',max_tokens), "provider_response_id":content.get("id"), "cost_reservation_usd": receipt["cost"] if receipt else None}
     except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
         raise ProviderFailure(f"{spec['label']} could not complete this request. Retry or check the provider configuration.") from exc
 

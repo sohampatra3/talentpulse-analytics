@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "../components/search-lab.css";
 
 html[data-theme="amber"] {
   --bg: #211d16;

@@ -100,12 +100,24 @@ export async function apiFetch<T>(
   const token = workspaceToken();
   if (token) headers.set("X-Workspace-Token", token);
   try {
-    const response = await fetch(`/api${path}`, {
+    let response = await fetch(`/api${path}`, {
       ...options,
       signal: controller.signal,
       headers,
     });
-    const data = await response.json().catch(() => null);
+    let data = await response.json().catch(() => null);
+    if (response.status === 401 && token && /workspace|invalid or expired/i.test(String(data?.detail || ""))) {
+      // Restore an expired demo workspace once, sharing the creation promise
+      // across concurrent requests. Valid workspace tokens are never replaced.
+      if (workspaceToken() === token) {
+        workspaceMemory = null;
+        try { localStorage.removeItem("talentpulse.workspace.v1"); } catch {}
+      }
+      const replacement = await ensureWorkspace();
+      headers.set("X-Workspace-Token", replacement);
+      response = await fetch(`/api${path}`, { ...options, signal: controller.signal, headers });
+      data = await response.json().catch(() => null);
+    }
     if (!response.ok) {
       const detail = data?.detail;
       throw new Error(

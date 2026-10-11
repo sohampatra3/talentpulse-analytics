@@ -26,7 +26,7 @@ flowchart LR
 ## Workspace
 
 - **Overview:** KPIs, period comparison, daily trends, market and device performance.
-- **Search experiments:** three-arm user-level analysis with confidence intervals, multiple-comparison correction, sample-ratio checks and operational guardrails; separate live manual/GPT-4o/GPT-OSS 120B comparison.
+- **Search experiments:** a five-section Search Quality & Experiment Lab with keyword/semantic/hybrid retrieval, selectable models, controlled document-RAG comparisons, relevance review, animated ranking/quality/cost/time charts, resumable runs, Adobe measurement mapping, sample-size planning and decision exports. The historical three-arm user-level experiment remains separate.
 - **Funnel & segments:** ordered session funnel, transition drop-off, segmentation and consistent filters.
 - **Release impact:** matched before/after windows and affected segments. Observational differences are hypotheses, not causal estimates.
 - **AI analyst:** evidence-backed interpretation, a chart draft using queried numbers, and an exportable recommendation.

@@ -69,6 +69,7 @@ import { ConnectorStudio, ExternalEvidence } from "./connectors";
 import { ModelPicker, useWorkspace } from "./workspace";
 import { DatasetReadiness } from "./uploads";
 import { RoleEvidence } from "./role-evidence";
+import { SearchLab } from "./search-lab";
 import {
   ActionFeedback,
   EmptyState,
@@ -388,6 +389,10 @@ function ArmName({ arm }: { arm: ExperimentArm }) {
 }
 
 export function ExperimentsView({ filters, navigate }: ViewProps) {
+  return <SearchLab filters={filters} navigate={navigate}><HistoricalExperimentsView filters={filters} navigate={navigate}/></SearchLab>;
+}
+
+function HistoricalExperimentsView({ filters, navigate }: ViewProps) {
   const workspace = useWorkspace();
   const supportsExperiments =
     !workspace.dataset || workspace.dataset.readiness.experiments !== false;
